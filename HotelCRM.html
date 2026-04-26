@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏨 Hotel Booking CRM</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    input, select, textarea { font-family: inherit; }
+    button { font-family: inherit; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // ── Seed data (sample bookings to get started) ──
+    const SEED = [
+      { id: 1, guestName: "Ahmed Al Rashid", project: "Management Bookings", account: "Tarfat Al Ebdaa", category: "Recruit - Admin", confirmationRef: "3876962", hotel: "Executives KAFD", roomType: "Standard Room", occupancy: "Single", boarding: "Bed and Breakfast", checkIn: "2024-04-30", checkOut: "2024-06-08", nights: 39, costPrice: 4290, salePrice: 5070, agent: "Sara M.", status: "Confirmed", notes: "" },
+      { id: 2, guestName: "Khalid Bin Nasser", project: "Site Operations", account: "Gulf Constructions", category: "Site Staff", confirmationRef: "3912045", hotel: "Novotel Riyadh", roomType: "Deluxe Room", occupancy: "Double", boarding: "Full Board", checkIn: "2024-05-10", checkOut: "2024-05-25", nights: 15, costPrice: 2250, salePrice: 2850, agent: "Omar K.", status: "Confirmed", notes: "Requires ground floor." },
+      { id: 3, guestName: "Mohammed Al Zahrani", project: "Management Bookings", account: "Tarfat Al Ebdaa", category: "Recruit - Engineer", confirmationRef: "3923110", hotel: "Executives KAFD", roomType: "Suite", occupancy: "Single", boarding: "Bed and Breakfast", checkIn: "2024-06-01", checkOut: "2024-07-01", nights: 30, costPrice: 6000, salePrice: 7200, agent: "Sara M.", status: "Pending", notes: "" },
+      { id: 4, guestName: "Faisal Al Otaibi", project: "Maintenance Crew", account: "Al Noor Services", category: "Technician", confirmationRef: "3934522", hotel: "Hilton Garden Inn", roomType: "Standard Room", occupancy: "Single", boarding: "Room Only", checkIn: "2024-04-15", checkOut: "2024-05-15", nights: 30, costPrice: 3300, salePrice: 3900, agent: "Nadia R.", status: "Checked Out", notes: "" },
+      { id: 5, guestName: "Tariq Al Ghamdi", project: "Site Operations", account: "Gulf Constructions", category: "Site Staff", confirmationRef: "3945678", hotel: "Novotel Riyadh", roomType: "Standard Room", occupancy: "Single", boarding: "Bed and Breakfast", checkIn: "2024-05-20", checkOut: "2024-06-20", nights: 31, costPrice: 3410, salePrice: 4030, agent: "Omar K.", status: "Confirmed", notes: "" },
+    ];
+
+    // ── Dropdown options – customise these for your company ──
+    const AGENTS    = ["Sara M.", "Omar K.", "Nadia R.", "Youssef A."];
+    const HOTELS    = ["Executives KAFD", "Novotel Riyadh", "Hilton Garden Inn", "Marriott Riyadh", "Radisson Blu"];
+    const ROOM_TYPES= ["Standard Room", "Deluxe Room", "Suite", "Twin Room"];
+    const OCCUPANCY = ["Single", "Double", "Triple"];
+    const BOARDING  = ["Room Only", "Bed and Breakfast", "Half Board", "Full Board"];
+    const STATUSES  = ["Pending", "Confirmed", "Checked In", "Checked Out", "Cancelled"];
+    const PROJECTS  = ["Management Bookings", "Site Operations", "Maintenance Crew", "VIP Guests", "Training Program"];
+    const ACCOUNTS  = ["Tarfat Al Ebdaa", "Gulf Constructions", "Al Noor Services", "Peak Consulting", "Horizon Group"];
+    const CATEGORIES= ["Recruit - Admin", "Recruit - Engineer", "Site Staff", "Technician", "Management"];
+
+    // ── Helpers ──
+    const fmt = n => {
+      const v = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0);
+      return `SAR ${v}`;
+    };
+    const calcNights = (ci, co) => {
+      if (!ci || !co) return 0;
+      const d = (new Date(co) - new Date(ci)) / 86400000;
+      return d > 0 ? Math.round(d) : 0;
+    };
+
+    // ── Export CSV (opens in Excel) ──
+    function exportCSV(data) {
+      const headers = ["ID","Guest Name","Project","Account","Category","Confirmation Ref","Hotel","Room Type","Occupancy","Boarding","Check-In","Check-Out","Nights","Cost Price (SAR)","Sale Price (SAR)","Profit (SAR)","Margin %","Agent","Status","Notes"];
+      const rows = data.map(r => [r.id, r.guestName, r.project, r.account, r.category, r.confirmationRef, r.hotel, r.roomType, r.occupancy, r.boarding, r.checkIn, r.checkOut, r.nights, r.costPrice, r.salePrice, (r.salePrice - r.costPrice), r.salePrice ? Math.round(((r.salePrice - r.costPrice) / r.salePrice) * 100) : 0, r.agent, r.status, r.notes]);
+      const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `hotel_bookings_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+    }
+
+    // ── Status colours ──
+    const SC = { Confirmed: "#22c55e", Pending: "#f59e0b", "Checked In": "#3b82f6", "Checked Out": "#8b5cf6", Cancelled: "#ef4444" };
+
+    function Badge({ status }) {
+      return (
+        <span style={{ background: SC[status] + "22", color: SC[status], border: `1px solid ${SC[status]}55`, borderRadius: 20, padding: "3px 11px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+          {status}
+        </span>
+      );
+    }
+
+    function StatCard({ label, value, sub, accent }) {
+      return (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "18px 22px", flex: 1, minWidth: 150, boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: accent || "#1e293b", lineHeight: 1 }}>{value}</div>
+          {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 5 }}>{sub}</div>}
+        </div>
+      );
+    }
+
+    function BarChart({ data, height = 130 }) {
+      const max = Math.max(...data.map(d => d.value), 1);
+      return (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height, paddingTop: 8 }}>
+          {data.map((d, i) => (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, textAlign: "center" }}>{fmt(d.value).replace("SAR ", "")}</div>
+              <div style={{ width: "100%", height: Math.max(4, (d.value / max) * (height - 32)), background: d.color || "#3b82f6", borderRadius: "5px 5px 0 0" }} />
+              <div style={{ fontSize: 10, color: "#94a3b8", textAlign: "center", lineHeight: 1.3 }}>{d.label}</div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    const emptyForm = { guestName: "", project: "", account: "", category: "", confirmationRef: "", hotel: "", roomType: "", occupancy: "Single", boarding: "Bed and Breakfast", checkIn: "", checkOut: "", nights: 0, costPrice: "", salePrice: "", agent: "", status: "Pending", notes: "" };
+
+    // ══════════════════════════════════════════════
+    //  MAIN APP
+    // ══════════════════════════════════════════════
+    function App() {
+      const [tab, setTab]         = useState("dashboard");
+      const [bookings, setBookings] = useState(SEED);
+      const [form, setForm]       = useState(emptyForm);
+      const [editId, setEditId]   = useState(null);
+      const [filters, setFilters] = useState({ search: "", agent: "", hotel: "", project: "", status: "", dateFrom: "", dateTo: "" });
+      const [toast, setToast]     = useState(null);
+
+      const showToast = (msg, type = "success") => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+      };
+
+      // filtered bookings
+      const filtered = useMemo(() => bookings.filter(b => {
+        if (filters.search && !`${b.guestName} ${b.confirmationRef} ${b.account}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
+        if (filters.agent   && b.agent   !== filters.agent)   return false;
+        if (filters.hotel   && b.hotel   !== filters.hotel)   return false;
+        if (filters.project && b.project !== filters.project) return false;
+        if (filters.status  && b.status  !== filters.status)  return false;
+        if (filters.dateFrom && b.checkIn < filters.dateFrom) return false;
+        if (filters.dateTo   && b.checkIn > filters.dateTo)   return false;
+        return true;
+      }), [bookings, filters]);
+
+      // summary stats
+      const totalRevenue = filtered.reduce((s, b) => s + (b.salePrice  || 0), 0);
+      const totalCost    = filtered.reduce((s, b) => s + (b.costPrice  || 0), 0);
+      const totalProfit  = totalRevenue - totalCost;
+      const totalNights  = filtered.reduce((s, b) => s + (b.nights    || 0), 0);
+      const margin       = totalRevenue ? Math.round((totalProfit / totalRevenue) * 100) : 0;
+
+      const hotelStats = useMemo(() => {
+        const map = {};
+        filtered.forEach(b => { map[b.hotel] = (map[b.hotel] || 0) + (b.salePrice || 0); });
+        return Object.entries(map).map(([label, value], i) => ({ label: label.split(" ")[0], value, color: ["#3b82f6","#22c55e","#f59e0b","#8b5cf6","#ef4444"][i%5] }));
+      }, [filtered]);
+
+      const projectStats = useMemo(() => {
+        const map = {};
+        filtered.forEach(b => { map[b.project] = (map[b.project] || 0) + (b.salePrice || 0); });
+        return Object.entries(map).map(([label, value], i) => ({ label: label.split(" ")[0], value, color: ["#0ea5e9","#10b981","#f97316","#a855f7","#ec4899"][i%5] }));
+      }, [filtered]);
+
+      // form helpers
+      const setField = (k, v) => setForm(f => {
+        const nf = { ...f, [k]: v };
+        if (k === "checkIn" || k === "checkOut")
+          nf.nights = calcNights(k === "checkIn" ? v : f.checkIn, k === "checkOut" ? v : f.checkOut);
+        return nf;
+      });
+
+      const openNew  = () => { setForm(emptyForm); setEditId(null); setTab("form"); };
+      const openEdit = b  => { setForm({ ...b }); setEditId(b.id); setTab("form"); };
+
+      const saveBooking = () => {
+        if (!form.guestName || !form.hotel || !form.checkIn || !form.checkOut) {
+          alert("Required fields: Guest Name, Hotel, Check-In, Check-Out"); return;
+        }
+        if (editId) {
+          setBookings(bs => bs.map(b => b.id === editId ? { ...form, id: editId } : b));
+          showToast("Booking updated successfully ✓");
+        } else {
+          setBookings(bs => [...bs, { ...form, id: Date.now(), nights: calcNights(form.checkIn, form.checkOut) }]);
+          showToast("Booking saved successfully ✓");
+        }
+        setTab("crm");
+      };
+
+      const deleteBooking = id => {
+        if (window.confirm("Are you sure you want to delete this booking?")) {
+          setBookings(bs => bs.filter(b => b.id !== id));
+          showToast("Booking deleted", "error");
+        }
+      };
+
+      const NAV = [
+        { id: "dashboard", label: "📊 Dashboard" },
+        { id: "crm",       label: "📋 All Bookings" },
+      ];
+
+      const iStyle = { border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none", background: "#f8fafc", color: "#1e293b", minWidth: 155 };
+
+      return (
+        <div style={{ fontFamily: "'Segoe UI', sans-serif", background: "#f1f5f9", minHeight: "100vh" }}>
+
+          {/* Toast */}
+          {toast && (
+            <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: toast.type === "error" ? "#ef4444" : "#22c55e", color: "#fff", padding: "12px 20px", borderRadius: 10, fontWeight: 700, fontSize: 13, boxShadow: "0 4px 20px rgba(0,0,0,.2)" }}>
+              {toast.msg}
+            </div>
+          )}
+
+          {/* Nav bar */}
+          <div style={{ background: "#0f172a", padding: "0 28px", display: "flex", alignItems: "center", boxShadow: "0 2px 12px rgba(0,0,0,.25)" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#fff", paddingRight: 28, borderRight: "1px solid #1e293b", marginRight: 8, padding: "16px 28px 16px 0" }}>
+              🏨 <span style={{ color: "#38bdf8" }}>HotelCRM</span>
+            </div>
+            {NAV.map(n => (
+              <button key={n.id} onClick={() => setTab(n.id)}
+                style={{ background: tab === n.id ? "#1e40af" : "transparent", color: tab === n.id ? "#fff" : "#94a3b8", border: "none", padding: "18px 20px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                {n.label}
+              </button>
+            ))}
+            <button onClick={openNew}
+              style={{ background: tab === "form" ? "#1e40af" : "transparent", color: tab === "form" ? "#fff" : "#94a3b8", border: "none", padding: "18px 20px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+              ➕ New Booking
+            </button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+              <button onClick={() => exportCSV(filtered)}
+                style={{ background: "#22c55e", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>
+                ⬇ Export to Excel
+              </button>
+            </div>
+          </div>
+
+          <div style={{ padding: "24px 28px", maxWidth: 1440, margin: "0 auto" }}>
+
+            {/* ═══ DASHBOARD ═══ */}
+            {tab === "dashboard" && (
+              <div>
+                <FilterBar filters={filters} setFilters={setFilters} bookings={bookings} iStyle={iStyle} />
+
+                {/* Stat cards */}
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 20 }}>
+                  <StatCard label="Total Bookings"  value={filtered.length}              sub={`of ${bookings.length} total`} />
+                  <StatCard label="Total Revenue"   value={fmt(totalRevenue)}             accent="#1d4ed8" />
+                  <StatCard label="Total Cost"      value={fmt(totalCost)}                accent="#dc2626" />
+                  <StatCard label="Gross Profit"    value={fmt(totalProfit)}              accent="#16a34a" sub={`Margin: ${margin}%`} />
+                  <StatCard label="Total Nights"    value={totalNights.toLocaleString()}  sub="booked nights" />
+                </div>
+
+                {/* Charts */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                  <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #e8eaf0" }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 2 }}>Revenue by Hotel</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 14 }}>Sale price breakdown per hotel</div>
+                    {hotelStats.length ? <BarChart data={hotelStats} /> : <div style={{ color: "#94a3b8", textAlign: "center", padding: 30, fontSize: 13 }}>No data</div>}
+                  </div>
+                  <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #e8eaf0" }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 2 }}>Revenue by Project</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 14 }}>Sale price breakdown per project</div>
+                    {projectStats.length ? <BarChart data={projectStats} /> : <div style={{ color: "#94a3b8", textAlign: "center", padding: 30, fontSize: 13 }}>No data</div>}
+                  </div>
+                </div>
+
+                {/* Status summary */}
+                <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #e8eaf0", marginBottom: 20 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Booking Status Overview</div>
+                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                    {STATUSES.map(s => {
+                      const count = filtered.filter(b => b.status === s).length;
+                      return (
+                        <div key={s} style={{ display: "flex", alignItems: "center", gap: 10, background: SC[s] + "11", borderRadius: 12, padding: "12px 18px", border: `1px solid ${SC[s]}33`, flex: 1, minWidth: 140 }}>
+                          <div style={{ width: 10, height: 10, borderRadius: "50%", background: SC[s] }} />
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13 }}>{s}</div>
+                            <div style={{ fontWeight: 900, color: SC[s], fontSize: 22, lineHeight: 1 }}>{count}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Agent performance */}
+                <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: "1px solid #e8eaf0" }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 16 }}>Agent Performance</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12 }}>
+                    {AGENTS.map(agent => {
+                      const ab   = filtered.filter(b => b.agent === agent);
+                      const rev  = ab.reduce((s, b) => s + (b.salePrice  || 0), 0);
+                      const cost = ab.reduce((s, b) => s + (b.costPrice || 0), 0);
+                      return (
+                        <div key={agent} style={{ background: "#f8fafc", borderRadius: 12, padding: "16px 18px", border: "1px solid #e2e8f0" }}>
+                          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>{agent}</div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{ab.length} booking{ab.length !== 1 ? "s" : ""}</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: "#1d4ed8" }}>{fmt(rev)}</div>
+                          <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 2 }}>Profit: {fmt(rev - cost)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ BOOKINGS TABLE ═══ */}
+            {tab === "crm" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 22 }}>All Bookings</div>
+                    <div style={{ color: "#64748b", fontSize: 13, marginTop: 2 }}>{filtered.length} record{filtered.length !== 1 ? "s" : ""} found</div>
+                  </div>
+                  <button onClick={openNew} style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 10, padding: "10px 22px", fontWeight: 800, cursor: "pointer", fontSize: 13 }}>
+                    + New Booking
+                  </button>
+                </div>
+
+                <FilterBar filters={filters} setFilters={setFilters} bookings={bookings} iStyle={iStyle} />
+
+                <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8eaf0", overflow: "hidden" }}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+                          {["Ref","Guest Name","Project","Hotel","Room","Check-In","Check-Out","Nights","Cost (SAR)","Sale (SAR)","Profit","Agent","Status","Actions"].map(h => (
+                            <th key={h} style={{ padding: "13px 14px", textAlign: "left", fontWeight: 700, color: "#475569", fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((b, i) => {
+                          const profit = (b.salePrice || 0) - (b.costPrice || 0);
+                          return (
+                            <tr key={b.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafbfc" }}
+                              onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
+                              onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafbfc"}>
+                              <td style={{ padding: "11px 14px", fontWeight: 700, color: "#1d4ed8", whiteSpace: "nowrap" }}>{b.confirmationRef || "—"}</td>
+                              <td style={{ padding: "11px 14px", fontWeight: 600, whiteSpace: "nowrap" }}>{b.guestName}</td>
+                              <td style={{ padding: "11px 14px", color: "#475569", whiteSpace: "nowrap" }}>{b.project || "—"}</td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{b.hotel}</td>
+                              <td style={{ padding: "11px 14px", color: "#64748b" }}>{b.roomType || "—"}</td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{b.checkIn}</td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{b.checkOut}</td>
+                              <td style={{ padding: "11px 14px", textAlign: "center", fontWeight: 700 }}>{b.nights}</td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap", color: "#dc2626", fontWeight: 600 }}>{fmt(b.costPrice)}</td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap", color: "#1d4ed8", fontWeight: 700 }}>{fmt(b.salePrice)}</td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap", fontWeight: 700, color: profit >= 0 ? "#16a34a" : "#dc2626" }}>{fmt(profit)}</td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>{b.agent || "—"}</td>
+                              <td style={{ padding: "11px 14px" }}><Badge status={b.status} /></td>
+                              <td style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>
+                                <button onClick={() => openEdit(b)} style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, marginRight: 4 }}>Edit</button>
+                                <button onClick={() => deleteBooking(b.id)} style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Delete</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filtered.length === 0 && (
+                          <tr><td colSpan={14} style={{ padding: "50px 14px", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+                            No bookings found. <span style={{ cursor: "pointer", color: "#1d4ed8", fontWeight: 700 }} onClick={openNew}>Add one?</span>
+                          </td></tr>
+                        )}
+                      </tbody>
+                      {filtered.length > 0 && (
+                        <tfoot>
+                          <tr style={{ background: "#0f172a", color: "#fff" }}>
+                            <td colSpan={8} style={{ padding: "13px 14px", fontWeight: 800, fontSize: 13 }}>TOTALS — {filtered.length} booking{filtered.length !== 1 ? "s" : ""}</td>
+                            <td style={{ padding: "13px 14px", fontWeight: 800, color: "#fca5a5", whiteSpace: "nowrap" }}>{fmt(totalCost)}</td>
+                            <td style={{ padding: "13px 14px", fontWeight: 800, color: "#93c5fd", whiteSpace: "nowrap" }}>{fmt(totalRevenue)}</td>
+                            <td style={{ padding: "13px 14px", fontWeight: 800, color: "#86efac", whiteSpace: "nowrap" }}>{fmt(totalProfit)}</td>
+                            <td colSpan={3} style={{ padding: "13px 14px", color: "#94a3b8", fontSize: 12 }}>Margin: {margin}%</td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ BOOKING FORM ═══ */}
+            {tab === "form" && (
+              <div style={{ maxWidth: 960, margin: "0 auto" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 24 }}>{editId ? "✏️ Edit Booking" : "➕ New Booking"}</div>
+                    <div style={{ color: "#64748b", fontSize: 13, marginTop: 3 }}>Fill in all reservation details below</div>
+                  </div>
+                  <button onClick={() => setTab("crm")} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 9, padding: "9px 18px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>← Back to Bookings</button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+                  {/* Guest Info */}
+                  <FormCard title="👤 Guest Information">
+                    <Field label="Guest Name *"          value={form.guestName}      onChange={v => setField("guestName", v)}      placeholder="Full guest name" />
+                    <Field label="Confirmation Reference" value={form.confirmationRef} onChange={v => setField("confirmationRef", v)} placeholder="Hotel booking ref" />
+                    <Field label="Account / Company"      value={form.account}        onChange={v => setField("account", v)}        type="select" options={["", ...ACCOUNTS]} />
+                    <Field label="Category / Group"       value={form.category}       onChange={v => setField("category", v)}       type="select" options={["", ...CATEGORIES]} />
+                    <Field label="Notes"                  value={form.notes}          onChange={v => setField("notes", v)}          type="textarea" placeholder="Special requests, notes..." />
+                  </FormCard>
+
+                  {/* Booking Details */}
+                  <FormCard title="🏨 Booking Details">
+                    <Field label="Project *"   value={form.project}   onChange={v => setField("project", v)}   type="select" options={["", ...PROJECTS]} />
+                    <Field label="Hotel *"     value={form.hotel}     onChange={v => setField("hotel", v)}     type="select" options={["", ...HOTELS]} />
+                    <Field label="Room Type"   value={form.roomType}  onChange={v => setField("roomType", v)}  type="select" options={["", ...ROOM_TYPES]} />
+                    <Field label="Occupancy"   value={form.occupancy} onChange={v => setField("occupancy", v)} type="select" options={OCCUPANCY} />
+                    <Field label="Boarding"    value={form.boarding}  onChange={v => setField("boarding", v)}  type="select" options={BOARDING} />
+                  </FormCard>
+
+                  {/* Dates */}
+                  <FormCard title="📅 Dates & Duration">
+                    <Field label="Check-In Date *"  value={form.checkIn}  onChange={v => setField("checkIn", v)}  type="date" />
+                    <Field label="Check-Out Date *" value={form.checkOut} onChange={v => setField("checkOut", v)} type="date" />
+                    <div style={{ background: form.nights > 0 ? "#eff6ff" : "#f8fafc", borderRadius: 12, padding: "14px 18px", border: `1px solid ${form.nights > 0 ? "#bfdbfe" : "#e2e8f0"}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 600, color: "#475569", fontSize: 13 }}>Duration (auto-calculated)</span>
+                      <span style={{ fontWeight: 900, fontSize: 28, color: form.nights > 0 ? "#1d4ed8" : "#cbd5e1" }}>
+                        {form.nights} <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>night{form.nights !== 1 ? "s" : ""}</span>
+                      </span>
+                    </div>
+                  </FormCard>
+
+                  {/* Finance */}
+                  <FormCard title="💰 Financial Details">
+                    <Field label="Cost Price (SAR) — hotel charges your company" value={form.costPrice} onChange={v => setField("costPrice", parseFloat(v) || "")} type="number" placeholder="0" />
+                    <Field label="Sale Price (SAR) — your company charges client" value={form.salePrice} onChange={v => setField("salePrice", parseFloat(v) || "")} type="number" placeholder="0" />
+                    {(form.costPrice > 0 && form.salePrice > 0) && (
+                      <div style={{ background: form.salePrice >= form.costPrice ? "#f0fdf4" : "#fef2f2", borderRadius: 12, padding: "14px 18px", border: `1px solid ${form.salePrice >= form.costPrice ? "#bbf7d0" : "#fecaca"}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>PROFIT</span>
+                          <span style={{ fontWeight: 900, fontSize: 16, color: form.salePrice >= form.costPrice ? "#16a34a" : "#dc2626" }}>{fmt(form.salePrice - form.costPrice)}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>MARGIN</span>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: form.salePrice >= form.costPrice ? "#16a34a" : "#dc2626" }}>
+                            {Math.round(((form.salePrice - form.costPrice) / form.salePrice) * 100)}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <Field label="Assigned Agent" value={form.agent}  onChange={v => setField("agent", v)}  type="select" options={["", ...AGENTS]} />
+                    <Field label="Booking Status" value={form.status} onChange={v => setField("status", v)} type="select" options={STATUSES} />
+                  </FormCard>
+                </div>
+
+                {/* Buttons */}
+                <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "flex-end" }}>
+                  <button onClick={() => setTab("crm")} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 10, padding: "13px 26px", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>Cancel</button>
+                  <button onClick={saveBooking} style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 10, padding: "13px 32px", fontWeight: 800, cursor: "pointer", fontSize: 14, boxShadow: "0 4px 14px rgba(29,78,216,.35)" }}>
+                    {editId ? "💾 Update Booking" : "✅ Save Booking"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    }
+
+    // ── Filter Bar ──
+    function FilterBar({ filters, setFilters, bookings, iStyle }) {
+      const f = (k, v) => setFilters(p => ({ ...p, [k]: v }));
+      const unique = key => [...new Set(bookings.map(b => b[key]).filter(Boolean))];
+      const hasFilters = Object.values(filters).some(Boolean);
+      return (
+        <div style={{ background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, padding: "14px 18px", marginBottom: 18, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <input value={filters.search} onChange={e => f("search", e.target.value)} placeholder="🔍 Search guest, ref, account..." style={{ ...iStyle, minWidth: 220 }} />
+          <select value={filters.status}  onChange={e => f("status",  e.target.value || "")} style={iStyle}><option value="">All Statuses</option>{STATUSES.map(s => <option key={s}>{s}</option>)}</select>
+          <select value={filters.agent}   onChange={e => f("agent",   e.target.value || "")} style={iStyle}><option value="">All Agents</option>{AGENTS.map(s => <option key={s}>{s}</option>)}</select>
+          <select value={filters.hotel}   onChange={e => f("hotel",   e.target.value || "")} style={iStyle}><option value="">All Hotels</option>{unique("hotel").map(s => <option key={s}>{s}</option>)}</select>
+          <select value={filters.project} onChange={e => f("project", e.target.value || "")} style={iStyle}><option value="">All Projects</option>{unique("project").map(s => <option key={s}>{s}</option>)}</select>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>From</span>
+            <input type="date" value={filters.dateFrom} onChange={e => f("dateFrom", e.target.value)} style={iStyle} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>To</span>
+            <input type="date" value={filters.dateTo} onChange={e => f("dateTo", e.target.value)} style={iStyle} />
+          </div>
+          {hasFilters && (
+            <button onClick={() => setFilters({ search: "", agent: "", hotel: "", project: "", status: "", dateFrom: "", dateTo: "" })}
+              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+              ✕ Clear Filters
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // ── Form Card ──
+    function FormCard({ title, children }) {
+      return (
+        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8eaf0" }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #f1f5f9" }}>{title}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{children}</div>
+        </div>
+      );
+    }
+
+    // ── Form Field ──
+    function Field({ label, value, onChange, type = "text", placeholder, options }) {
+      const s = { width: "100%", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 13px", fontSize: 13, outline: "none", background: "#f8fafc", color: "#1e293b", boxSizing: "border-box" };
+      return (
+        <div>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 5, letterSpacing: 0.5, textTransform: "uppercase" }}>{label}</label>
+          {type === "select" ? (
+            <select value={value} onChange={e => onChange(e.target.value)} style={s}>
+              {options.map(o => <option key={o} value={o}>{o || "— Select —"}</option>)}
+            </select>
+          ) : type === "textarea" ? (
+            <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3} style={{ ...s, resize: "vertical" }} />
+          ) : (
+            <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={s} />
+          )}
+        </div>
+      );
+    }
+
+    // ── Mount ──
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
